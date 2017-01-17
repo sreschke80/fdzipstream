@@ -101,6 +101,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <string.h>
 #include <errno.h>
 
@@ -266,17 +267,15 @@ zs_deflate_finish ( ZIPstream *zstream, ZIPentry *zentry )
   if ( rv == Z_DATA_ERROR )
     {
       fprintf (stderr, "zs_deflate_finish: Deflate ended, but output buffers not flushed!\n");
-      return -1;
     }
   else if ( rv == Z_STREAM_ERROR )
     {
       fprintf (stderr, "zs:deflate_finish: deflateEnd() returned error.\n");
-      return -1;
     }
 
   free (zlstream);
 
-  return 0;
+  return (rv >= 0 ? 0 : rv);
 }
 
 
@@ -366,10 +365,11 @@ zs_init ( int fd, ZIPstream *zs )
 {
   ZIPentry *zentry, *zefree;
   ZIPmethod *method, *mfree;
+  ZIPstream *_zs = NULL;
 
   if ( ! zs )
     {
-      zs = (ZIPstream *) malloc (sizeof(ZIPstream));
+      _zs = zs = (ZIPstream *) malloc (sizeof(ZIPstream));
     }
   else
     {
@@ -406,6 +406,7 @@ zs_init ( int fd, ZIPstream *zs )
                              zs_store_process,
                              NULL ) )
     {
+      free (_zs);
       return NULL;
     }
 
@@ -414,6 +415,7 @@ zs_init ( int fd, ZIPstream *zs )
                              zs_deflate_process,
                              zs_deflate_finish ) )
     {
+      free (_zs);
       return NULL;
     }
 
@@ -757,8 +759,8 @@ zs_entryend ( ZIPstream *zstream, ZIPentry *zentry, ssize_t *writestatus)
   /* Flush the entry */
   if ( ! zs_entrydata (zstream, zentry, NULL, 0, writestatus) )
     {
-      fprintf (stderr, "Error flushing entry (writestatus: %lld)\n",
-               (long long int) writestatus);
+      fprintf (stderr, "Error flushing entry (writestatus: %p)\n",
+               writestatus);
       return NULL;
     }
 
